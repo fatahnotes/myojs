@@ -1,0 +1,101 @@
+{
+  "theme": "Light Theme",
+  "archetype": "Archetype 4 (Swiss & High-Contrast)",
+  "rationale": "Academia needs authority, clarity, and objective truth. The UI avoids the typical 'SaaS template' look to embrace a Brutalist, editorial feel that honors scholarly publishing and peer review.",
+  "colors": {
+    "background": "#F9FAFB",
+    "surface": "#FFFFFF",
+    "text_primary": "#111827",
+    "text_secondary": "#4B5563",
+    "primary_accent": "#002FA7",
+    "status": {
+      "reject": "#DC2626",
+      "accept": "#059669",
+      "review": "#D97706"
+    }
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Cabinet Grotesk",
+      "description": "Bold, authoritative sans-serif for high impact.",
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter leading-none font-bold",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight leading-tight font-bold",
+      "h3": "text-xl sm:text-2xl tracking-tight font-medium"
+    },
+    "body": {
+      "font_family": "IBM Plex Sans",
+      "description": "Legible, clean, technical sans for reading long academic papers and data tables.",
+      "base": "text-base leading-relaxed",
+      "small": "text-sm leading-normal text-secondary"
+    },
+    "overlines": "text-xs uppercase tracking-[0.2em] font-semibold"
+  },
+  "spacing_and_layout": {
+    "public_pages": {
+      "grid": "grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8 lg:gap-12",
+      "spacing": "py-24 px-6 md:px-12 lg:px-24",
+      "alignment": "Asymmetrical layout. Heavy use of negative space to direct focus."
+    },
+    "dashboard": {
+      "grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6",
+      "spacing": "p-4 md:p-6 lg:p-8",
+      "alignment": "Strict grid hierarchy. All available pixels utilized. Left sidebar navigation for better vertical scaling."
+    }
+  },
+  "surface_strategies": {
+    "dashboard_cards": "Flat background (#FFFFFF), sharp or minimal rounded corners (rounded-sm or max 8px), 1px solid border (border-gray-200). NO default shadows. On hover: subtle shadow (shadow-sm) and slight lift (-translate-y-0.5).",
+    "public_header": "Glassmorphism: bg-white/70 backdrop-blur-xl border-b border-gray-200/50.",
+    "dashboard_header": "Solid white background with a hard bottom border."
+  },
+  "components": {
+    "rules": "Use Shadcn UI extensively for the dashboard logic, but heavily customize it to match the Swiss Brutalist aesthetic (remove soft shadows, keep borders sharp).",
+    "buttons": "Square or slightly rounded edges. Primary button uses #002FA7 background, high contrast white text. Hover state must lighten slightly, explicitly defining text color (hover:bg-blue-800 hover:text-white).",
+    "tables": "Crucial for Paper Submissions list. Must use sticky header, row hover effects (bg-gray-50), and clear status badges (Accept/Reject/Under Review).",
+    "tabs": "Used heavily in Author Dashboard (Submit, Status, Revisions). Remove pill-style, use stark underline style (border-b-2 border-transparent, active state border-[#002FA7]).",
+    "dialogs": "Used for Reviewer scoring and Editor decision submission. Must have overlay bg-black/50, solid white surface, sharp edges.",
+    "forms": "Inputs must have clear borders, focus ring in primary blue. Use Shadcn's Form, Input, and Select."
+  },
+  "navigation": {
+    "public": "Sticky top bar, Logo on left, Links (Journals, About, Language EN/ID), Primary CTA (Login/Register) on right.",
+    "dashboard": "Collapsible left sidebar for efficient use of horizontal space for data tables. Clear indicators for Author, Editor, Reviewer, Admin roles."
+  },
+  "motion": {
+    "general": "Minimalist. Use for feedback, not decoration.",
+    "hover": "Explicit hover states on all interactive elements (buttons, links, table rows).",
+    "transitions": "transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease",
+    "accessibility": "Respect prefers-reduced-motion."
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "Clean, line-based icons for academic dashboard to maintain the functional aesthetic."
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure text contrast meets APCA/WCAG standards. Focus states must have higher contrast.",
+    "testing": "All interactive and key informational elements MUST have data-testid attributes (e.g., data-testid='submit-paper-button', data-testid='login-submit-button'). Convention is kebab-case, role-based."
+  },
+  "media": {
+    "instructions": "Use ONLY these URLs. Do not use generic placeholders. Main agent must map these to components.",
+    "assets": [
+      {
+        "category": "hero",
+        "url": "https://static.prod-images.emergentagent.com/jobs/fcee9e80-3638-4d2f-ace1-0cb3fe5582e6/images/01c1bc0640dd831fe03f7cd269b2bb4db08e043a6e431725aa04ad97f9ed4dad.png",
+        "description": "Minimalist architectural shot of academic library. Use as main hero background on public landing page."
+      },
+      {
+        "category": "abstract_knowledge",
+        "url": "https://static.prod-images.emergentagent.com/jobs/fcee9e80-3638-4d2f-ace1-0cb3fe5582e6/images/58177d6ca25614ed10fd6e7bbb72b6401b7faa5a95ef37fd904237611a3211a8.png",
+        "description": "Abstract floating paper data blocks. Use for the 'About' section or 'Publishing Process' background."
+      },
+      {
+        "category": "library_interior",
+        "url": "https://images.unsplash.com/photo-1756037020659-6f9d3418f6b6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBsaWJyYXJ5JTIwaW50ZXJpb3J8ZW58MHx8fHwxNzc3NzM2NDI1fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Modern library interior. Use as contextual image for the 'Journals Archive' or 'Publications' listing page."
+      },
+      {
+        "category": "researcher",
+        "url": "https://images.unsplash.com/photo-1691934310377-7868e489e215?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzR8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjByZXNlYXJjaGVyJTIwcmVhZGluZ3xlbnwwfHx8fDE3Nzc3MzY0MjV8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Researcher reading a paper. Use in the 'Join as a Reviewer' CTA section."
+      }
+    ]
+  }
+}
