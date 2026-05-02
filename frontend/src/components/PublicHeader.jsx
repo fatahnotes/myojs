@@ -8,32 +8,37 @@ export default function PublicHeader() {
   const { t, lang, setLang } = useI18n();
   const nav = useNavigate();
 
+  const links = [
+    { to: "/about", label: t("nav_about"), tid: "nav-about" },
+    { to: "/call-for-papers", label: t("nav_cfp"), tid: "nav-cfp" },
+    { to: "/dates", label: t("nav_dates"), tid: "nav-dates" },
+    { to: "/templates", label: t("nav_templates"), tid: "nav-templates" },
+    { to: "/journals", label: t("nav_archive"), tid: "nav-archive" },
+  ];
+
   return (
-    <header className="sticky top-0 z-40 w-full bg-white/70 backdrop-blur-xl border-b border-gray-200/60">
-      <div className="max-w-7xl mx-auto flex items-center justify-between px-6 md:px-12 h-16">
+    <header className="sticky top-0 z-40 w-full bg-white/75 backdrop-blur-xl border-b border-gray-200/70">
+      <div className="max-w-7xl mx-auto flex items-center justify-between px-6 md:px-10 h-16">
         <Link to="/" data-testid="logo-link" className="flex items-center gap-3 group">
-          <div className="w-8 h-8 bg-[#002FA7] flex items-center justify-center">
-            <span className="text-white font-display font-bold text-sm tracking-tighter">O</span>
+          <div className="w-9 h-9 bg-[#002FA7] flex items-center justify-center">
+            <span className="text-white font-display font-bold text-sm tracking-tighter">S</span>
           </div>
           <div className="leading-tight">
-            <div className="font-display text-base font-bold tracking-tight">{t("app_name")}</div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 -mt-0.5">{t("app_full_name")}</div>
+            <div className="font-display text-base font-bold tracking-tight">{t("conf_short")}</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 -mt-0.5">{t("conf_location")}</div>
           </div>
         </Link>
-        <nav className="hidden md:flex items-center gap-8 text-sm">
-          <Link to="/journals" data-testid="nav-journals" className="hover:text-[#002FA7] transition-base">{t("nav_journals")}</Link>
-          <Link to="/about" data-testid="nav-about" className="hover:text-[#002FA7] transition-base">{t("nav_about")}</Link>
+        <nav className="hidden lg:flex items-center gap-7 text-sm">
+          {links.map((l) => (
+            <Link key={l.to} to={l.to} data-testid={l.tid} className="hover:text-[#002FA7] transition-base">
+              {l.label}
+            </Link>
+          ))}
         </nav>
         <div className="flex items-center gap-2">
           <div className="flex items-center border border-gray-300 rounded-sm overflow-hidden text-xs font-mono">
-            <button
-              data-testid="lang-en"
-              onClick={() => setLang("en")}
-              className={`px-2 py-1 transition-base ${lang === "en" ? "bg-[#002FA7] text-white" : "text-gray-700 hover:bg-gray-100"}`}>EN</button>
-            <button
-              data-testid="lang-id"
-              onClick={() => setLang("id")}
-              className={`px-2 py-1 transition-base ${lang === "id" ? "bg-[#002FA7] text-white" : "text-gray-700 hover:bg-gray-100"}`}>ID</button>
+            <button data-testid="lang-en" onClick={() => setLang("en")} className={`px-2 py-1 transition-base ${lang === "en" ? "bg-[#002FA7] text-white" : "text-gray-700 hover:bg-gray-100"}`}>EN</button>
+            <button data-testid="lang-id" onClick={() => setLang("id")} className={`px-2 py-1 transition-base ${lang === "id" ? "bg-[#002FA7] text-white" : "text-gray-700 hover:bg-gray-100"}`}>ID</button>
           </div>
           {user ? (
             <>
@@ -42,7 +47,7 @@ export default function PublicHeader() {
             </>
           ) : (
             <>
-              <Button data-testid="header-login-btn" variant="ghost" className="rounded-sm" onClick={() => nav("/login")}>{t("nav_login")}</Button>
+              <Button data-testid="header-login-btn" variant="ghost" className="rounded-sm hidden sm:inline-flex" onClick={() => nav("/login")}>{t("nav_login")}</Button>
               <Button data-testid="header-register-btn" className="rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white" onClick={() => nav("/register")}>{t("nav_register")}</Button>
             </>
           )}

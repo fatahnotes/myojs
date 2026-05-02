@@ -26,7 +26,8 @@ export default function PaperDetail() {
   const [openAssign, setOpenAssign] = useState(false);
   const [openDecide, setOpenDecide] = useState(false);
   const [openReview, setOpenReview] = useState(false);
-  const [decision, setDecision] = useState({ decision: "accept", note: "" });
+  const [openPreview, setOpenPreview] = useState(false);
+  const [decision, setDecision] = useState({ decision: "accept", note: "", doi: "" });
   const [review, setReview] = useState({ score: 7, recommendation: "accept", comments: "", confidential_notes: "" });
   const [revisionFile, setRevisionFile] = useState(null);
 
@@ -58,7 +59,9 @@ export default function PaperDetail() {
 
   const decide = async () => {
     try {
-      await api.post(`/papers/${id}/decision`, decision);
+      const payload = { decision: decision.decision, note: decision.note };
+      if (decision.decision === "publish" && decision.doi) payload.doi = decision.doi;
+      await api.post(`/papers/${id}/decision`, payload);
       toast.success("Decision recorded");
       setOpenDecide(false);
       load();
@@ -151,14 +154,21 @@ export default function PaperDetail() {
           </div>
         )}
         {paper.file_id && (
-          <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4">
+          <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4 gap-2 flex-wrap">
             <div className="flex items-center gap-3 text-sm">
               <FileText size={16} className="text-[#002FA7]" />
               <span>{paper.file_name}</span>
             </div>
-            <Button data-testid="download-file-btn" variant="outline" className="rounded-sm" onClick={downloadFile}>
-              <Download size={14} className="mr-2"/> Download
-            </Button>
+            <div className="flex items-center gap-2">
+              {paper.file_name && /\.pdf$/i.test(paper.file_name) && (
+                <Button data-testid="preview-file-btn" variant="outline" className="rounded-sm" onClick={() => setOpenPreview(true)}>
+                  {t("preview")}
+                </Button>
+              )}
+              <Button data-testid="download-file-btn" variant="outline" className="rounded-sm" onClick={downloadFile}>
+                <Download size={14} className="mr-2"/> Download
+              </Button>
+            </div>
           </div>
         )}
       </Card>
@@ -221,6 +231,13 @@ export default function PaperDetail() {
                   <Label className="text-xs uppercase tracking-wider">Note to author</Label>
                   <Textarea data-testid="decision-note" rows={5} value={decision.note} onChange={(e)=>setDecision({...decision, note: e.target.value})} className="rounded-sm mt-2"/>
                 </div>
+                {decision.decision === "publish" && (
+                  <div>
+                    <Label className="text-xs uppercase tracking-wider">{t("doi")}</Label>
+                    <Input data-testid="decision-doi" value={decision.doi} onChange={(e)=>setDecision({...decision, doi: e.target.value})} className="rounded-sm mt-2" placeholder="10.9999/seaipc2026.xxxx"/>
+                    <div className="text-xs text-gray-500 mt-1">{t("doi_hint")}</div>
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button data-testid="confirm-decision-btn" onClick={decide} className="rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">Finalize</Button>
@@ -287,9 +304,29 @@ export default function PaperDetail() {
         <Card className="rounded-sm border border-gray-200 shadow-none p-6 bg-white">
           <div className="overline text-[#002FA7] mb-2">— Editor Decision</div>
           <div className="text-lg font-semibold capitalize">{paper.decision.replace("_", " ")}</div>
+          {paper.doi && (
+            <div className="mt-2 font-mono text-xs text-gray-600">DOI: <span className="text-gray-900 font-semibold">{paper.doi}</span></div>
+          )}
           {paper.decision_note && <p className="text-sm text-gray-700 mt-3 whitespace-pre-wrap">{paper.decision_note}</p>}
         </Card>
       )}
+
+      {/* PDF Preview Dialog */}
+      <Dialog open={openPreview} onOpenChange={setOpenPreview}>
+        <DialogContent className="rounded-sm max-w-5xl p-0 overflow-hidden">
+          <DialogHeader className="p-4 border-b border-gray-200">
+            <DialogTitle>{paper.file_name}</DialogTitle>
+          </DialogHeader>
+          {openPreview && paper.file_id && (
+            <iframe
+              data-testid="pdf-preview-iframe"
+              src={`${API}/files/${paper.file_id}/preview?token=${localStorage.getItem("ojs_token") || ""}`}
+              title="PDF preview"
+              className="w-full h-[75vh] bg-gray-100"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Reviews */}
       <Card className="rounded-sm border border-gray-200 shadow-none p-6 bg-white">

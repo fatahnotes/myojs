@@ -52,9 +52,10 @@ export default function Login() {
           <Button data-testid="login-submit" type="submit" disabled={loading} className="w-full rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">
             {loading ? "..." : t("btn_login")}
           </Button>
-          <p className="text-sm text-gray-600 text-center">
-            {t("no_account")} <Link to="/register" className="text-[#002FA7] font-semibold">{t("nav_register")}</Link>
-          </p>
+          <div className="flex items-center justify-between text-sm">
+            <Link to="/forgot-password" data-testid="forgot-link" className="text-[#002FA7] hover:underline">{t("forgot_link")}</Link>
+            <Link to="/register" className="text-[#002FA7] font-semibold">{t("nav_register")} →</Link>
+          </div>
         </form>
         <div className="mt-6 text-xs text-gray-500 font-mono border border-dashed border-gray-300 p-3">
           <div className="font-semibold mb-1">Demo accounts:</div>

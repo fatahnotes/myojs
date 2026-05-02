@@ -16,8 +16,9 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, UploadFile, File, Depends, Query, Header
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response as FastResponse
 from starlette.middleware.cors import CORSMiddleware
+import secrets
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from bson import ObjectId
@@ -216,6 +217,14 @@ class ReviewIn(BaseModel):
 class DecisionIn(BaseModel):
     decision: Literal["accept", "reject", "revision_required", "publish"]
     note: str = ""
+    doi: Optional[str] = None
+
+class ForgotIn(BaseModel):
+    email: EmailStr
+
+class ResetIn(BaseModel):
+    token: str
+    password: str = Field(min_length=6)
 
 class UpdateUserRoleIn(BaseModel):
     role: Role
@@ -265,6 +274,42 @@ async def logout(response: Response):
 @api_router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return user
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(body: ForgotIn):
+    email = body.email.lower()
+    u = await db.users.find_one({"email": email})
+    # Always respond 200 (no enumeration)
+    if u:
+        token = secrets.token_urlsafe(32)
+        await db.password_reset_tokens.insert_one({
+            "token": token,
+            "user_id": u["id"],
+            "email": email,
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+            "used": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        reset_link = f"{FRONTEND_URL}/reset-password?token={token}"
+        logger.info(f"[PASSWORD RESET] link for {email}: {reset_link}")
+        html = f"""<div style='font-family:sans-serif;padding:20px'>
+            <h2>SEAIPC 2026 — Password Reset</h2>
+            <p>Click the link below to reset your password (valid 1 hour):</p>
+            <p><a href='{reset_link}'>{reset_link}</a></p>
+            <p>If you did not request this, ignore this email.</p></div>"""
+        await send_email(email, "SEAIPC 2026 — Reset your password", html)
+    return {"ok": True, "message": "If the email exists, a reset link has been sent."}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(body: ResetIn):
+    rec = await db.password_reset_tokens.find_one({"token": body.token, "used": False}, {"_id": 0})
+    if not rec:
+        raise HTTPException(status_code=400, detail="Invalid or used token")
+    if datetime.fromisoformat(rec["expires_at"]) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Token expired")
+    await db.users.update_one({"id": rec["user_id"]}, {"$set": {"password_hash": hash_password(body.password)}})
+    await db.password_reset_tokens.update_one({"token": body.token}, {"$set": {"used": True}})
+    return {"ok": True}
 
 # ==================== USERS ====================
 @api_router.get("/users")
@@ -317,6 +362,7 @@ async def create_paper(body: PaperIn, user: dict = Depends(get_current_user)):
         "reviewer_ids": [],
         "decision": None,
         "decision_note": None,
+        "doi": None,
         "created_at": now,
         "updated_at": now,
     }
@@ -414,6 +460,32 @@ async def download_file(file_id: str, user: dict = Depends(get_current_user)):
     return StreamingResponse(BytesIO(data), media_type=f.get("content_type", ct),
                              headers={"Content-Disposition": f'attachment; filename="{f["original_filename"]}"'})
 
+@api_router.get("/files/{file_id}/preview")
+async def preview_file(file_id: str, token: Optional[str] = Query(None), request: Request = None):
+    # Support query-param token for <iframe> embedding
+    user = None
+    if token:
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+            user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+        except Exception:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    else:
+        user = await get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    f = await db.files.find_one({"id": file_id, "is_deleted": False}, {"_id": 0})
+    if not f:
+        raise HTTPException(status_code=404, detail="File not found")
+    p = await db.papers.find_one({"id": f["paper_id"]}, {"_id": 0})
+    role = user["role"]
+    allowed = role in ("admin", "editor") or p["author_id"] == user["id"] or user["id"] in p.get("reviewer_ids", [])
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    data, ct = get_object(f["storage_path"])
+    return FastResponse(content=data, media_type=f.get("content_type", ct),
+                        headers={"Content-Disposition": f'inline; filename="{f["original_filename"]}"'})
+
 # ==================== REVIEWS ====================
 @api_router.post("/papers/{paper_id}/assign-reviewers")
 async def assign_reviewers(paper_id: str, body: AssignReviewersIn, user: dict = Depends(require_roles("editor"))):
@@ -494,10 +566,14 @@ async def make_decision(paper_id: str, body: DecisionIn, user: dict = Depends(re
     status_map = {"accept": "accepted", "reject": "rejected",
                   "revision_required": "revision_required", "publish": "published"}
     new_status = status_map[body.decision]
-    await db.papers.update_one({"id": paper_id}, {"$set": {
+    update_doc = {
         "status": new_status, "decision": body.decision, "decision_note": body.note,
         "updated_at": datetime.now(timezone.utc).isoformat()
-    }})
+    }
+    if body.decision == "publish":
+        doi = body.doi or f"10.9999/seaipc2026.{paper_id[:8]}"
+        update_doc["doi"] = doi
+    await db.papers.update_one({"id": paper_id}, {"$set": update_doc})
     title_msg = {
         "accept": "Paper Accepted", "reject": "Paper Rejected",
         "revision_required": "Revision Required", "publish": "Paper Published"
@@ -557,6 +633,7 @@ async def startup():
     await db.papers.create_index("author_id")
     await db.reviews.create_index([("paper_id", 1), ("reviewer_id", 1)], unique=True)
     await db.notifications.create_index("user_id")
+    await db.password_reset_tokens.create_index("token", unique=True)
     # Seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@ojs.com").lower()
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
@@ -605,7 +682,13 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://seaipc2026.imz.or.id",
+        "https://seaipc2026.imz.or.id",
+        FRONTEND_URL,
+        "http://localhost:3000",
+    ],
+    allow_origin_regex=r"https://.*\.preview\.emergentagent\.com",
     allow_methods=["*"],
     allow_headers=["*"],
 )

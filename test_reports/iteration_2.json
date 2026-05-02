@@ -1,0 +1,45 @@
+{
+  "summary": "SEAIPC 2026 new features + full regression tested. 45/46 backend tests pass (12/12 new SEAIPC tests pass: forgot-password, reset-password, DOI on publish, inline PDF preview). One pre-existing flaky test (test_author_uploads_revision) failed due to intermittent Emergent object storage 500 upstream (not SEAIPC regression). Frontend smoke tested: SEAIPC rebranding, /call-for-papers renders 39 sub-themes, /dates (6 date rows), /templates (EN + MY .docx download buttons), /forgot-password + /reset-password pages, Login has working 'Forgot password?' link, /about shows SEAIPC Waqf content, PaperDetail Preview iframe modal works for editor, Decision dialog has conditional DOI input (decision-doi testid) when 'publish' selected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/papers/{id}/upload", "issue": "Intermittent 500 from upstream Emergent Object Storage (https://integrations.emergentagent.com/objstore) - caused 1 flaky failure in full regression run. Not a code bug. Test has skip-on-storage-500 guard but this one passed the initial 200 check then upstream failed on a subsequent upload."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PaperDetail Preview/Decision dialogs", "issues": ["Radix DialogContent missing aria-describedby (a11y warning, not blocking)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_ojs_api.py",
+    "/app/backend/tests/test_seaipc_features.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/pytest_seaipc.xml"
+  ],
+  "action_items": [
+    "(Optional) Add aria-describedby to PaperDetail Dialog components to silence Radix warning",
+    "(Optional) Split server.py (700 lines) into routers if growth continues - carried over from iteration_1",
+    "(Optional) Tighten CORS allow_origins from '*' to explicit list now that SEAIPC domain is known (seaipc2026.imz.or.id)"
+  ],
+  "critical_code_review_comments": [
+    "preview_file endpoint accepts JWT via query param which will be logged in access logs / server logs - consider signed short-lived tokens (HMAC with short TTL) specifically scoped to file_id to reduce blast radius if the URL is shared or logged.",
+    "Password reset token stored in db.password_reset_tokens with 1-hour expiry but no index on 'token' field or TTL index - consider adding a TTL index on expires_at for automatic cleanup and a unique index on token.",
+    "forgot-password has no per-email rate limit - attacker can flood resend attempts. Consider throttling to N requests per email per hour.",
+    "DOI auto-generation uses first 8 chars of paper UUID (f\"10.9999/seaipc2026.{paper_id[:8]}\") - collision-free but not ISO 26324 compliant (10.9999 is reserved for testing only). Fine for dev but document this for production registration with DOI registrar.",
+    "Publish decision overwrites doi on every publish call - if an editor re-publishes after correction, custom DOI from previous call is wiped. Consider preserving existing DOI when body.doi not provided.",
+    "Templates page uses <a download> approach which may still open in new tab rather than force-download depending on Content-Disposition of the CDN hosted .docx. Verify CDN sets attachment disposition; otherwise consider adding a server-side proxy endpoint."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_seaipc_features.py (new - 12 tests for password reset, DOI on publish, file preview)"
+  ],
+  "success_rate": {"backend": "97.8% (45/46) - 100% on SEAIPC new-feature tests (12/12). 1 flaky storage upstream failure.", "frontend": "100% smoke-tested new routes + rebrand + preview/decision dialogs"},
+  "test_credentials": "admin@ojs.com/admin123, editor@ojs.com/editor123, reviewer@ojs.com/reviewer123, author@ojs.com/author123 - all verified",
+  "seed_data_creation": "TEST_-prefixed papers (TEST_DOI_Auto_*, TEST_DOI_Explicit_*, TEST_Preview_*) created via author and published via editor. Temporary users test_reset_* created for full password-reset flow and cleaned up by admin delete.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Two backend test files now: /app/backend/tests/test_ojs_api.py (34 original) + /app/backend/tests/test_seaipc_features.py (12 SEAIPC). Run both: `REACT_APP_BACKEND_URL=... pytest /app/backend/tests/ -v`. Password-reset tests extract the reset token by tailing /var/log/supervisor/backend.err.log grep '[PASSWORD RESET]' - depends on logger.info being sent to stderr (currently works). Email sending is MOCKED (RESEND_API_KEY empty). Flaky test to watch: test_author_uploads_revision - retry on storage 500. Preview endpoint supports both ?token=<jwt> query param (for iframe) and Authorization Bearer header; enforces the same role-based authz as /download (admin/editor/author-owner/assigned-reviewer).",
+  "rca of the issue": "No SEAIPC regression bugs found. The only failing test (test_author_uploads_revision) is due to intermittent upstream 500 from Emergent Object Storage - same test passed in iteration_1 and passes on retry. Reproduction: retry the test; mitigation: add exponential-backoff retry in upload_paper_file wrapper OR rely on storage guard skip already present in test."
+}

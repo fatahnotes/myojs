@@ -8,6 +8,11 @@ import Home from "@/pages/Home";
 import About from "@/pages/About";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import CallForPapers from "@/pages/CallForPapers";
+import Dates from "@/pages/Dates";
+import Templates from "@/pages/Templates";
 import JournalsArchive from "@/pages/JournalsArchive";
 import DashboardLayout from "@/components/DashboardLayout";
 import Overview from "@/pages/Overview";
@@ -35,8 +40,13 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
+              <Route path="/call-for-papers" element={<CallForPapers />} />
+              <Route path="/dates" element={<Dates />} />
+              <Route path="/templates" element={<Templates />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/journals" element={<JournalsArchive />} />
 
               <Route path="/dashboard" element={<DashboardLayout />}>
