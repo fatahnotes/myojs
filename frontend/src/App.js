@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { I18nProvider } from "@/i18n";
+import { ContentProvider } from "@/lib/content";
 
 import Home from "@/pages/Home";
 import About from "@/pages/About";
@@ -21,6 +22,7 @@ import SubmitPaper from "@/pages/SubmitPaper";
 import PaperDetail from "@/pages/PaperDetail";
 import Notifications from "@/pages/Notifications";
 import UserManagement from "@/pages/UserManagement";
+import CMS from "@/pages/CMS";
 
 function RoleGate({ roles, children }) {
   const { user, loading } = useAuth();
@@ -36,7 +38,8 @@ function App() {
       <I18nProvider>
         <BrowserRouter>
           <AuthProvider>
-            <Toaster position="top-right" richColors />
+            <ContentProvider>
+              <Toaster position="top-right" richColors />
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
@@ -56,12 +59,14 @@ function App() {
                 <Route path="assigned" element={<RoleGate roles={["reviewer"]}><PapersList scope="assigned" /></RoleGate>} />
                 <Route path="submissions" element={<RoleGate roles={["editor"]}><PapersList scope="all" /></RoleGate>} />
                 <Route path="users" element={<RoleGate roles={["admin"]}><UserManagement /></RoleGate>} />
+                <Route path="cms" element={<RoleGate roles={["admin"]}><CMS /></RoleGate>} />
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="papers/:id" element={<PaperDetail />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </ContentProvider>
           </AuthProvider>
         </BrowserRouter>
       </I18nProvider>

@@ -34,7 +34,7 @@ export default function UserManagement() {
   return (
     <div className="space-y-6">
       <header>
-        <div className="overline text-[#002FA7]">— Admin</div>
+        <div className="overline text-[var(--brand)]">— Admin</div>
         <h1 className="font-display text-3xl lg:text-4xl tracking-tighter font-bold mt-2">User Management</h1>
       </header>
       <Card className="rounded-sm border border-gray-200 shadow-none p-0 overflow-hidden bg-white">

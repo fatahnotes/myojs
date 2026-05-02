@@ -32,8 +32,8 @@ export default function JournalsArchive() {
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
           {papers.map((p) => (
-            <article key={p.id} data-testid={`archive-paper-${p.id}`} className="border-t border-gray-300 pt-6 hover:border-[#002FA7] transition-base">
-              <div className="overline text-[#002FA7] mb-2">— {new Date(p.updated_at).getFullYear()}{p.doi && <span className="ml-2 text-gray-500">· DOI {p.doi}</span>}</div>
+            <article key={p.id} data-testid={`archive-paper-${p.id}`} className="border-t border-gray-300 pt-6 hover:border-[var(--brand)] transition-base">
+              <div className="overline text-[var(--brand)] mb-2">— {new Date(p.updated_at).getFullYear()}{p.doi && <span className="ml-2 text-gray-500">· DOI {p.doi}</span>}</div>
               <h2 className="font-display text-2xl lg:text-3xl tracking-tight font-bold">{p.title}</h2>
               <p className="text-sm text-gray-600 mt-2">by {p.author_name}{p.co_authors?.length ? ` · ${p.co_authors.join(", ")}`: ""}</p>
               <p className="text-sm text-gray-700 mt-3 line-clamp-4">{p.abstract}</p>

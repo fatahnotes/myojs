@@ -34,7 +34,7 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-[#F9FAFB]">
       <PublicHeader />
       <div className="max-w-md mx-auto px-6 py-20">
-        <div className="overline text-[#002FA7] mb-4">— Recovery</div>
+        <div className="overline text-[var(--brand)] mb-4">— Recovery</div>
         <h1 className="font-display text-3xl lg:text-4xl tracking-tight font-bold mb-8">{t("reset_title")}</h1>
         {!token ? (
           <div className="border border-red-200 bg-red-50 text-red-900 p-4 text-sm">
@@ -47,11 +47,11 @@ export default function ResetPassword() {
               <Input data-testid="reset-password" type="password" required minLength={6} value={password} onChange={(e)=>setPassword(e.target.value)} className="rounded-sm mt-2" />
             </div>
             {err && <div data-testid="reset-error" className="text-sm text-red-600 border border-red-200 bg-red-50 p-2">{err}</div>}
-            <Button data-testid="reset-submit" type="submit" disabled={loading} className="w-full rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">
+            <Button data-testid="reset-submit" type="submit" disabled={loading} className="w-full rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white">
               {loading ? "..." : t("btn_reset")}
             </Button>
             <p className="text-sm text-gray-600 text-center">
-              <Link to="/login" className="text-[#002FA7] font-semibold">← {t("nav_login")}</Link>
+              <Link to="/login" className="text-[var(--brand)] font-semibold">← {t("nav_login")}</Link>
             </p>
           </form>
         )}

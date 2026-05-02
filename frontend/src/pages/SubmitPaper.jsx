@@ -45,7 +45,7 @@ export default function SubmitPaper() {
   return (
     <div className="space-y-6 max-w-3xl">
       <header>
-        <div className="overline text-[#002FA7]">— New Submission</div>
+        <div className="overline text-[var(--brand)]">— New Submission</div>
         <h1 className="font-display text-3xl lg:text-4xl tracking-tighter font-bold mt-2">{t("sidebar_submit")}</h1>
       </header>
       <Card className="rounded-sm border border-gray-200 shadow-none p-6 bg-white">
@@ -70,7 +70,7 @@ export default function SubmitPaper() {
           </div>
           <div>
             <Label className="text-xs uppercase tracking-wider">{t("paper_file")}</Label>
-            <label htmlFor="paper-file-input" className="mt-2 flex items-center gap-3 border border-dashed border-gray-300 px-4 py-6 cursor-pointer hover:border-[#002FA7] transition-base">
+            <label htmlFor="paper-file-input" className="mt-2 flex items-center gap-3 border border-dashed border-gray-300 px-4 py-6 cursor-pointer hover:border-[var(--brand)] transition-base">
               <UploadCloud size={20} className="text-gray-500" />
               <div className="flex-1">
                 <div className="text-sm font-medium">{file ? file.name : "Click to choose PDF/DOCX"}</div>
@@ -80,7 +80,7 @@ export default function SubmitPaper() {
             <input id="paper-file-input" data-testid="paper-file-input" type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={(e)=>setFile(e.target.files?.[0] || null)} />
           </div>
           {err && <div data-testid="submit-error" className="text-sm text-red-600 border border-red-200 bg-red-50 p-2">{err}</div>}
-          <Button data-testid="submit-paper-btn" type="submit" disabled={loading} className="rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white px-6">
+          <Button data-testid="submit-paper-btn" type="submit" disabled={loading} className="rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white px-6">
             {loading ? "..." : t("btn_submit_paper")}
           </Button>
         </form>

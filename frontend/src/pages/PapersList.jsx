@@ -32,12 +32,12 @@ export default function PapersList({ scope = "all" }) {
     <div className="space-y-6">
       <header className="flex items-end justify-between">
         <div>
-          <div className="overline text-[#002FA7]">— Papers</div>
+          <div className="overline text-[var(--brand)]">— Papers</div>
           <h1 className="font-display text-3xl lg:text-4xl tracking-tighter font-bold mt-2">{titles[scope]}</h1>
         </div>
         {scope === "mine" && (
           <Link to="/dashboard/submit">
-            <Button data-testid="papers-submit-btn" className="rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">+ {t("sidebar_submit")}</Button>
+            <Button data-testid="papers-submit-btn" className="rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white">+ {t("sidebar_submit")}</Button>
           </Link>
         )}
       </header>
@@ -61,13 +61,13 @@ export default function PapersList({ scope = "all" }) {
             {papers.map((p) => (
               <TableRow key={p.id} className="hover:bg-gray-50 transition-base border-b border-gray-100">
                 <TableCell className="font-medium">
-                  <Link to={`/dashboard/papers/${p.id}`} data-testid={`paper-row-${p.id}`} className="hover:text-[#002FA7]">{p.title}</Link>
+                  <Link to={`/dashboard/papers/${p.id}`} data-testid={`paper-row-${p.id}`} className="hover:text-[var(--brand)]">{p.title}</Link>
                 </TableCell>
                 <TableCell className="text-sm text-gray-600">{p.author_name}</TableCell>
                 <TableCell><StatusBadge status={p.status} /></TableCell>
                 <TableCell className="text-xs font-mono text-gray-500">{new Date(p.created_at).toLocaleDateString()}</TableCell>
                 <TableCell className="text-right">
-                  <Link to={`/dashboard/papers/${p.id}`} className="text-sm text-[#002FA7] hover:underline">{t("view")} →</Link>
+                  <Link to={`/dashboard/papers/${p.id}`} className="text-sm text-[var(--brand)] hover:underline">{t("view")} →</Link>
                 </TableCell>
               </TableRow>
             ))}

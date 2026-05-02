@@ -1,34 +1,28 @@
 import PublicHeader from "@/components/PublicHeader";
 import PublicFooter from "@/components/PublicFooter";
 import { useI18n } from "@/i18n";
+import { useContent } from "@/lib/content";
 import { CalendarDays } from "lucide-react";
 
 export default function Dates() {
   const { t } = useI18n();
-  const rows = [
-    { label: t("d_abstract"), date: t("d_abstract_date"), tag: "Submission" },
-    { label: t("d_full"), date: t("d_full_date"), tag: "Submission" },
-    { label: t("d_early"), date: t("d_early_date"), tag: "Payment" },
-    { label: t("d_final"), date: t("d_final_date"), tag: "Final" },
-    { label: t("d_conf"), date: t("d_conf_date"), tag: "Event" },
-    { label: t("d_visit"), date: t("d_visit_date"), tag: "Event" },
-  ];
+  const { content } = useContent();
+  const dates = content.dates || [];
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
       <PublicHeader />
       <section className="max-w-5xl mx-auto px-6 md:px-12 py-16 lg:py-24">
-        <div className="overline text-[#002FA7] mb-4">— Schedule</div>
+        <div className="overline text-[var(--brand)] mb-4">— Schedule</div>
         <h1 className="font-display text-4xl lg:text-6xl tracking-tighter font-bold mb-10">{t("dates_title")}</h1>
-
         <div className="border-t border-gray-300">
-          {rows.map((r, i) => (
+          {dates.map((r, i) => (
             <div
               key={i}
               data-testid={`date-row-${i}`}
               className="grid grid-cols-12 items-center gap-4 border-b border-gray-300 py-6 hover:bg-white transition-base"
             >
               <div className="col-span-1 flex justify-center">
-                <CalendarDays size={18} className="text-[#002FA7]" />
+                <CalendarDays size={18} className="text-[var(--brand)]" />
               </div>
               <div className="col-span-7 md:col-span-6">
                 <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-gray-500 mb-1">{r.tag}</div>
@@ -40,7 +34,6 @@ export default function Dates() {
             </div>
           ))}
         </div>
-
         <p className="text-xs font-mono text-gray-500 mt-8">* Dates are subject to change. Please check back regularly.</p>
       </section>
       <PublicFooter />

@@ -115,7 +115,7 @@ export default function PaperDetail() {
 
   return (
     <div className="space-y-8 max-w-5xl">
-      <Link to="/dashboard" className="text-sm text-gray-500 hover:text-[#002FA7] flex items-center gap-1" data-testid="back-btn"><ArrowLeft size={14}/> Back</Link>
+      <Link to="/dashboard" className="text-sm text-gray-500 hover:text-[var(--brand)] flex items-center gap-1" data-testid="back-btn"><ArrowLeft size={14}/> Back</Link>
 
       <header className="space-y-3">
         <div className="flex items-center gap-3">
@@ -132,7 +132,7 @@ export default function PaperDetail() {
         <div className="grid grid-cols-4 gap-2">
           {timeline.map((step, i) => (
             <div key={i} className="relative">
-              <div className={`h-1 ${step.active ? "bg-[#002FA7]" : "bg-gray-200"}`} />
+              <div className={`h-1 ${step.active ? "bg-[var(--brand)]" : "bg-gray-200"}`} />
               <div className="mt-3">
                 <div className={`text-sm font-semibold ${step.active ? "text-gray-900" : "text-gray-400"}`}>{step.label}</div>
                 <div className="text-[10px] font-mono text-gray-500 mt-1">{step.date ? new Date(step.date).toLocaleDateString() : "—"}</div>
@@ -156,7 +156,7 @@ export default function PaperDetail() {
         {paper.file_id && (
           <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4 gap-2 flex-wrap">
             <div className="flex items-center gap-3 text-sm">
-              <FileText size={16} className="text-[#002FA7]" />
+              <FileText size={16} className="text-[var(--brand)]" />
               <span>{paper.file_name}</span>
             </div>
             <div className="flex items-center gap-2">
@@ -178,7 +178,7 @@ export default function PaperDetail() {
         {isEditor && (
           <Dialog open={openAssign} onOpenChange={(v)=>{ setOpenAssign(v); if(v) loadReviewers(); }}>
             <DialogTrigger asChild>
-              <Button data-testid="assign-reviewers-btn" className="rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white"><UserPlus size={14} className="mr-2"/>{t("assign_reviewers")}</Button>
+              <Button data-testid="assign-reviewers-btn" className="rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white"><UserPlus size={14} className="mr-2"/>{t("assign_reviewers")}</Button>
             </DialogTrigger>
             <DialogContent className="rounded-sm max-w-md">
               <DialogHeader><DialogTitle>{t("assign_reviewers")}</DialogTitle></DialogHeader>
@@ -201,7 +201,7 @@ export default function PaperDetail() {
                 ))}
               </div>
               <DialogFooter>
-                <Button data-testid="confirm-assign-btn" onClick={assign} className="rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">Assign</Button>
+                <Button data-testid="confirm-assign-btn" onClick={assign} className="rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white">Assign</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -240,7 +240,7 @@ export default function PaperDetail() {
                 )}
               </div>
               <DialogFooter>
-                <Button data-testid="confirm-decision-btn" onClick={decide} className="rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">Finalize</Button>
+                <Button data-testid="confirm-decision-btn" onClick={decide} className="rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white">Finalize</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -249,7 +249,7 @@ export default function PaperDetail() {
         {isReviewer && (
           <Dialog open={openReview} onOpenChange={setOpenReview}>
             <DialogTrigger asChild>
-              <Button data-testid="submit-review-btn" className="rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">{t("submit_review")}</Button>
+              <Button data-testid="submit-review-btn" className="rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white">{t("submit_review")}</Button>
             </DialogTrigger>
             <DialogContent className="rounded-sm max-w-xl">
               <DialogHeader><DialogTitle>{t("submit_review")}</DialogTitle></DialogHeader>
@@ -282,7 +282,7 @@ export default function PaperDetail() {
                 </div>
               </div>
               <DialogFooter>
-                <Button data-testid="confirm-review-btn" onClick={submitReview} className="rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">Submit</Button>
+                <Button data-testid="confirm-review-btn" onClick={submitReview} className="rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white">Submit</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -294,7 +294,7 @@ export default function PaperDetail() {
             <label htmlFor="revision-input" className="text-sm border border-gray-900 px-4 py-2 cursor-pointer hover:bg-gray-900 hover:text-white transition-base flex items-center gap-2">
               <UploadCloud size={14}/> {revisionFile ? revisionFile.name : "Choose revision"}
             </label>
-            {revisionFile && <Button data-testid="upload-revision-btn" onClick={uploadRevision} className="rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">{t("upload_revision")}</Button>}
+            {revisionFile && <Button data-testid="upload-revision-btn" onClick={uploadRevision} className="rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white">{t("upload_revision")}</Button>}
           </div>
         )}
       </div>
@@ -302,7 +302,7 @@ export default function PaperDetail() {
       {/* Decision */}
       {paper.decision && (
         <Card className="rounded-sm border border-gray-200 shadow-none p-6 bg-white">
-          <div className="overline text-[#002FA7] mb-2">— Editor Decision</div>
+          <div className="overline text-[var(--brand)] mb-2">— Editor Decision</div>
           <div className="text-lg font-semibold capitalize">{paper.decision.replace("_", " ")}</div>
           {paper.doi && (
             <div className="mt-2 font-mono text-xs text-gray-600">DOI: <span className="text-gray-900 font-semibold">{paper.doi}</span></div>

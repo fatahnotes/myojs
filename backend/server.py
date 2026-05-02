@@ -229,6 +229,191 @@ class ResetIn(BaseModel):
 class UpdateUserRoleIn(BaseModel):
     role: Role
 
+# ==================== CONTENT / CMS ====================
+DEFAULT_CONTENT = {
+    "id": "singleton",
+    "theme": "blue-classic",
+    "branding": {
+        "conf_short": "SEAIPC 2026",
+        "conf_full": "9th Southeast Asia International Philanthropy Conference 2026",
+        "conf_location": "Jakarta / Bogor, Indonesia",
+        "conf_date": "26 – 27 August 2026",
+        "conf_theme": "Waqf for the Future: Building Lasting Impact and Economic Resilience in Southeast Asia",
+        "hero_overline": "— Vol. 09 · Jakarta / Bogor · 26–27 Aug 2026",
+        "hero_title": "Waqf for the Future.",
+        "hero_title2": "Building Lasting Impact and Economic Resilience in Southeast Asia.",
+        "hero_subtitle": "The 9th Southeast Asia International Philanthropy Conference brings together academicians, researchers, industry, government, and the public to a forum on Islamic microfinance, philanthropy, and the mainstream economy.",
+        "stat_edition": "9th",
+        "stat_tracks": "39",
+        "stat_journals": "4",
+        "logo_url": "",
+        "logo_file_id": "",
+    },
+    "flyer": {
+        "enabled": False,
+        "image_url": "",
+        "image_file_id": "",
+        "title": "Official Conference Flyer",
+        "caption": "Download the full SEAIPC 2026 programme and venue details.",
+        "download_url": "",
+    },
+    "dates": [
+        {"tag": "Submission", "label": "Abstract Submission", "date": "15 May 2026"},
+        {"tag": "Submission", "label": "Full Paper Submission", "date": "11 July 2026"},
+        {"tag": "Payment", "label": "Early Bird Payment", "date": "10 June 2026"},
+        {"tag": "Final", "label": "Final Manuscript & Payment", "date": "19 July 2026"},
+        {"tag": "Event", "label": "Conference Dates", "date": "26 – 27 August 2026"},
+        {"tag": "Event", "label": "City & Empowerment Visit", "date": "28 August 2026"},
+    ],
+    "about": {
+        "title": "About SEAIPC 2026",
+        "body": "The Southeast Asia International Philanthropy Conference (SEAIPC) is an annual conference which brings together academicians, researchers, industry experts, government, and concerned public to a forum on issues pertaining Islamic microfinance and philanthropy. Previous SEAIPCs were held in Jakarta, Bandung, Melaka, Jogjakarta, Bangkok, and Sarawak. This year, SEAIPC will be held in Jakarta / Bogor, Indonesia.",
+        "objectives": [
+            "Bring stakeholders involved in philanthropy to discuss, exchange ideas, and share experiences.",
+            "Present findings on business and management perspectives of philanthropy.",
+            "Incorporate sustainability in philanthropy activities.",
+            "Explore new opportunities in philanthropy globally.",
+            "Provide a platform for philanthropy-related organisations to exhibit products, innovations, and services.",
+        ],
+        "attendees": [
+            "Government GLCs & Private Companies",
+            "Researchers",
+            "NGOs",
+            "Academicians",
+            "Graduate Students",
+        ],
+        "venue_items": [
+            "Jakarta: Ashley Hotel or Millennium Hotel",
+            "Bogor: IPB Convention Center Hotel",
+            "City Tour: Tanah Abang, Thamrin City, and Bogor",
+            "Philanthropy Visit: Zona Madina Dompet Dhuafa, Bogor",
+        ],
+        "organizer_body": "In collaboration with IMZ Capital · Eight Duren Tiga Selatan No. 8, Jakarta Selatan, Indonesia",
+        "contact_phone": "+62 852 1564 6958",
+        "contact_email": "training@imz.or.id",
+    },
+    "cfp": {
+        "title": "Call for Papers",
+        "intro": "We welcome original contributions across the following sub-themes. All accepted abstracts will be published in the conference proceedings with an e-ISBN. Selected full papers will be considered for publication in partner journals.",
+        "sub_themes": [
+            "Mainstream Philanthropy", "Business and Management", "Societal Well-Being", "Zakat",
+            "Islamic Economics", "Entrepreneurship", "Global Business", "Social Welfare",
+            "Madani Concept", "Waqf", "Islamic Corporate Governance", "Economics",
+            "Operation Management", "Well-being", "Sustainable Development Goals (SDGs)",
+            "Islamic Finance", "Tourism", "Philanthropy Employment / Labor Services",
+            "Supply Chain", "Environment and Sustainability", "Ar-Rahnu",
+            "Islamic Management of Philanthropy", "Health Philanthropy", "Insurance and Takaful",
+            "Halal Supply Chain", "Education", "Early Childhood Education",
+            "Fundraising and Crowdfunding", "Halal Industry / Halal Ecosystem",
+            "Industrial Revolution", "Financial Management", "Wills and Faraid",
+            "Ageing Population and Well-being", "Business Ethics", "Financial Accounting",
+            "Marketing", "Investment", "Digital Business and Entrepreneurship", "Sukuk",
+        ],
+        "publications": [
+            "Al-Iqtishad: Jurnal Ilmu Ekonomi Syariah, UIN Syarif Hidayatullah Jakarta (Sinta 2)",
+            "Ahkam: Jurnal Ilmu Syariah, UIN Syarif Hidayatullah Jakarta (Q1 Scopus)",
+            "Journal of Islamic Philanthropy & Social Finance (CIPSF, UiTM Malaysia)",
+            "E-Journal of Islamic Thought & Understanding (E-JITU), Mycite index",
+        ],
+    },
+    "templates": [
+        {
+            "name": "E-JITU Template (English)",
+            "language": "English",
+            "filename": "E-JITU_Template_ENGLISH.docx",
+            "url": "https://customer-assets.emergentagent.com/job_paper-review-flow/artifacts/us8z6fop_E-JITU%20Template%20%28ENGLISH%29%20%E2%80%93%20Download%20This.docx",
+        },
+        {
+            "name": "E-JITU Template (Bahasa Melayu)",
+            "language": "Bahasa Melayu",
+            "filename": "E-JITU_Template_BAHASA_MELAYU.docx",
+            "url": "https://customer-assets.emergentagent.com/job_paper-review-flow/artifacts/ezczxwag_E-JITU%20Template%20%28BAHASA%20MELAYU%29%20%E2%80%93%20Download%20This.docx",
+        },
+    ],
+}
+
+class ContentIn(BaseModel):
+    theme: Optional[str] = None
+    branding: Optional[dict] = None
+    flyer: Optional[dict] = None
+    dates: Optional[List[dict]] = None
+    about: Optional[dict] = None
+    cfp: Optional[dict] = None
+    templates: Optional[List[dict]] = None
+
+@api_router.get("/content")
+async def get_content():
+    c = await db.site_content.find_one({"id": "singleton"}, {"_id": 0})
+    if not c:
+        await db.site_content.insert_one({**DEFAULT_CONTENT})
+        return DEFAULT_CONTENT
+    # Ensure all top-level keys exist
+    merged = {**DEFAULT_CONTENT, **{k: v for k, v in c.items() if v is not None}}
+    return merged
+
+@api_router.put("/content")
+async def update_content(body: ContentIn, user: dict = Depends(require_roles("admin"))):
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    await db.site_content.update_one(
+        {"id": "singleton"},
+        {"$set": updates, "$setOnInsert": {"id": "singleton"}},
+        upsert=True,
+    )
+    c = await db.site_content.find_one({"id": "singleton"}, {"_id": 0})
+    return c
+
+@api_router.post("/content/flyer/upload")
+async def upload_flyer(file: UploadFile = File(...), user: dict = Depends(require_roles("admin"))):
+    return await _upload_content_image(file, user, kind="flyer", allowed=("jpg","jpeg","png","webp","pdf"))
+
+@api_router.post("/content/logo/upload")
+async def upload_logo(file: UploadFile = File(...), user: dict = Depends(require_roles("admin"))):
+    return await _upload_content_image(file, user, kind="logo", allowed=("jpg","jpeg","png","webp","svg"))
+
+async def _upload_content_image(file: UploadFile, user: dict, kind: str, allowed: tuple):
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
+    if ext not in allowed:
+        raise HTTPException(status_code=400, detail=f"Allowed: {', '.join(allowed)}")
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+    file_id = str(uuid.uuid4())
+    path = f"{APP_NAME}/{kind}s/{file_id}.{ext}"
+    mime_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                "webp": "image/webp", "pdf": "application/pdf", "svg": "image/svg+xml"}
+    content_type = mime_map.get(ext, "application/octet-stream")
+    result = put_object(path, data, content_type)
+    await db.files.insert_one({
+        "id": file_id,
+        "paper_id": None,
+        "storage_path": result["path"],
+        "original_filename": file.filename,
+        "content_type": content_type,
+        "size": result.get("size", len(data)),
+        "uploaded_by": user["id"],
+        "is_deleted": False,
+        "kind": kind,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    public_url = f"/api/public/{kind}/{file_id}"
+    return {"file_id": file_id, "url": public_url, "filename": file.filename}
+
+@api_router.get("/public/flyer/{file_id}")
+async def public_flyer(file_id: str):
+    return await _public_content_file(file_id, "flyer")
+
+@api_router.get("/public/logo/{file_id}")
+async def public_logo(file_id: str):
+    return await _public_content_file(file_id, "logo")
+
+async def _public_content_file(file_id: str, kind: str):
+    f = await db.files.find_one({"id": file_id, "is_deleted": False, "kind": kind}, {"_id": 0})
+    if not f:
+        raise HTTPException(status_code=404, detail=f"{kind} not found")
+    data, ct = get_object(f["storage_path"])
+    return FastResponse(content=data, media_type=f.get("content_type", ct),
+                        headers={"Content-Disposition": f'inline; filename="{f["original_filename"]}"'})
+
 # ==================== AUTH ROUTES ====================
 @api_router.post("/auth/register")
 async def register(body: RegisterIn, response: Response):
@@ -634,6 +819,11 @@ async def startup():
     await db.reviews.create_index([("paper_id", 1), ("reviewer_id", 1)], unique=True)
     await db.notifications.create_index("user_id")
     await db.password_reset_tokens.create_index("token", unique=True)
+    await db.site_content.create_index("id", unique=True)
+    # Seed default content if missing
+    if not await db.site_content.find_one({"id": "singleton"}):
+        await db.site_content.insert_one({**DEFAULT_CONTENT})
+        logger.info("Seeded default site_content")
     # Seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@ojs.com").lower()
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
@@ -685,7 +875,6 @@ app.add_middleware(
     allow_origins=[
         "http://seaipc2026.imz.or.id",
         "https://seaipc2026.imz.or.id",
-        FRONTEND_URL,
         "http://localhost:3000",
     ],
     allow_origin_regex=r"https://.*\.preview\.emergentagent\.com",

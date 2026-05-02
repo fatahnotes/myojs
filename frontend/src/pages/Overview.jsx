@@ -14,7 +14,7 @@ function StatCard({ label, value, icon: Icon, testid }) {
           <div className="overline text-gray-500">{label}</div>
           <div className="font-display text-4xl font-bold tracking-tighter mt-2">{value}</div>
         </div>
-        <Icon className="text-[#002FA7]" size={20} />
+        <Icon className="text-[var(--brand)]" size={20} />
       </div>
     </Card>
   );
@@ -32,7 +32,7 @@ export default function Overview() {
   return (
     <div className="space-y-8">
       <header>
-        <div className="overline text-[#002FA7]">— {role?.toUpperCase()}</div>
+        <div className="overline text-[var(--brand)]">— {role?.toUpperCase()}</div>
         <h1 className="font-display text-3xl lg:text-4xl tracking-tighter font-bold mt-2">{t("overview_welcome")}, {user?.name}</h1>
         <p className="text-gray-600 text-sm mt-2">Today: {new Date().toLocaleDateString(undefined, { weekday:"long", year:"numeric", month:"long", day:"numeric" })}</p>
       </header>

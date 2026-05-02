@@ -36,7 +36,7 @@ export default function Register() {
     <div className="min-h-screen bg-[#F9FAFB]">
       <PublicHeader />
       <div className="max-w-md mx-auto px-6 py-20">
-        <div className="overline text-[#002FA7] mb-4">— New Account</div>
+        <div className="overline text-[var(--brand)] mb-4">— New Account</div>
         <h1 className="font-display text-3xl lg:text-4xl tracking-tight font-bold mb-8">{t("register_title")}</h1>
         <form onSubmit={submit} className="space-y-5 bg-white border border-gray-200 p-6">
           <div>
@@ -56,11 +56,11 @@ export default function Register() {
             <Input data-testid="register-password" type="password" required minLength={6} value={form.password} onChange={(e)=>setForm({...form, password: e.target.value})} className="rounded-sm mt-2" />
           </div>
           {err && <div data-testid="register-error" className="text-sm text-red-600 border border-red-200 bg-red-50 p-2">{err}</div>}
-          <Button data-testid="register-submit" type="submit" disabled={loading} className="w-full rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">
+          <Button data-testid="register-submit" type="submit" disabled={loading} className="w-full rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white">
             {loading ? "..." : t("btn_register")}
           </Button>
           <p className="text-sm text-gray-600 text-center">
-            {t("have_account")} <Link to="/login" className="text-[#002FA7] font-semibold">{t("nav_login")}</Link>
+            {t("have_account")} <Link to="/login" className="text-[var(--brand)] font-semibold">{t("nav_login")}</Link>
           </p>
         </form>
       </div>

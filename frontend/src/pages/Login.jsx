@@ -37,7 +37,7 @@ export default function Login() {
     <div className="min-h-screen bg-[#F9FAFB]">
       <PublicHeader />
       <div className="max-w-md mx-auto px-6 py-20">
-        <div className="overline text-[#002FA7] mb-4">— Authentication</div>
+        <div className="overline text-[var(--brand)] mb-4">— Authentication</div>
         <h1 className="font-display text-3xl lg:text-4xl tracking-tight font-bold mb-8">{t("login_title")}</h1>
         <form onSubmit={submit} className="space-y-5 bg-white border border-gray-200 p-6">
           <div>
@@ -49,12 +49,12 @@ export default function Login() {
             <Input data-testid="login-password" type="password" required value={password} onChange={(e)=>setPassword(e.target.value)} className="rounded-sm mt-2" />
           </div>
           {err && <div data-testid="login-error" className="text-sm text-red-600 border border-red-200 bg-red-50 p-2">{err}</div>}
-          <Button data-testid="login-submit" type="submit" disabled={loading} className="w-full rounded-sm bg-[#002FA7] hover:bg-blue-800 text-white">
+          <Button data-testid="login-submit" type="submit" disabled={loading} className="w-full rounded-sm bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-white">
             {loading ? "..." : t("btn_login")}
           </Button>
           <div className="flex items-center justify-between text-sm">
-            <Link to="/forgot-password" data-testid="forgot-link" className="text-[#002FA7] hover:underline">{t("forgot_link")}</Link>
-            <Link to="/register" className="text-[#002FA7] font-semibold">{t("nav_register")} →</Link>
+            <Link to="/forgot-password" data-testid="forgot-link" className="text-[var(--brand)] hover:underline">{t("forgot_link")}</Link>
+            <Link to="/register" className="text-[var(--brand)] font-semibold">{t("nav_register")} →</Link>
           </div>
         </form>
         <div className="mt-6 text-xs text-gray-500 font-mono border border-dashed border-gray-300 p-3">

@@ -6,13 +6,13 @@
 
 :root {
     /* OJS Swiss / Brutalist Light */
-    --background: 220 14% 98%;        /* #F9FAFB */
-    --foreground: 222 47% 11%;        /* #111827 */
+    --background: 220 14% 98%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 224 100% 33%;          /* #002FA7 IKB */
+    --primary: 224 100% 33%;
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14% 96%;
     --secondary-foreground: 222 47% 11%;
@@ -26,6 +26,12 @@
     --input: 220 13% 91%;
     --ring: 224 100% 33%;
     --radius: 0.25rem;
+
+    /* Theme brand palette (set dynamically via applyPalette) */
+    --brand: #002FA7;
+    --brand-hover: #1e3a8a;
+    --brand-soft: #e0e7ff;
+    --brand-on: #ffffff;
 }
 
 * {
@@ -85,9 +91,15 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Sidebar nav active */
 .nav-item-active {
-    background-color: #002FA7;
-    color: white;
+    background-color: var(--brand);
+    color: var(--brand-on);
 }
+
+.brand-text { color: var(--brand); }
+.brand-bg { background-color: var(--brand); color: var(--brand-on); }
+.brand-bg:hover { background-color: var(--brand-hover); }
+.brand-border { border-color: var(--brand); }
+.brand-soft-bg { background-color: var(--brand-soft); }
 
 .transition-base {
     transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
