@@ -6,71 +6,74 @@
 ## Deployment Target
 - Production: http://seaipc2026.imz.or.id/
 
-## User Choices
-- Roles: Author + Reviewer + Editor + Admin
-- Auth: JWT custom (email + password) + password reset via email
-- File storage: Emergent Object Storage (PDF/DOCX)
-- Email: Resend (MOCKED until RESEND_API_KEY provided)
-- UI: Bilingual English + Bahasa Indonesia
-
-## Conference Context
-- **SEAIPC 2026** — 9th Southeast Asia International Philanthropy Conference
-- Theme: *Waqf for the Future: Building Lasting Impact and Economic Resilience in Southeast Asia*
-- Dates: 26–27 August 2026 (+ 28 Aug visits)
-- Venue: Jakarta / Bogor, Indonesia
-- Organiser: In collaboration with IMZ Capital
-- 39 sub-themes, 4 partner journals (Al-Iqtishad, Ahkam, JIPSF, E-JITU)
-
 ## Architecture
 - Backend: FastAPI + MongoDB (motor), JWT (PyJWT), bcrypt, Emergent Object Storage, Resend SDK
 - Frontend: React 19 + React Router 7 + Tailwind + shadcn/ui + sonner + axios + i18n (EN/ID)
-- Design: Swiss / Brutalist light theme (IBM Plex Sans, #002FA7 IKB primary, sharp 0.25rem radius)
+- Design: Swiss / Brutalist light theme — palette dynamically switchable via CSS variables (`--brand`, `--brand-hover`, `--brand-soft`, `--brand-on`)
+
+## Conference Context
+- **SEAIPC 2026** — 9th Southeast Asia International Philanthropy Conference
+- Theme: *Waqf for the Future*
+- Dates: 26–27 August 2026 · Jakarta / Bogor
+- 39 sub-themes, 4 partner journals, 2 paper templates (EN + BM)
 
 ## What's Been Implemented
-### Iteration 1 (Feb 2026)
-- Auth: register, login, logout, /me (JWT + cookie)
-- Admin/demo seeding on startup (admin/editor/reviewer/author)
-- Papers CRUD, upload (PDF/DOCX) to Emergent Object Storage, download with RBAC
-- Review flow: assign reviewers, submit review (score + recommendation + confidential notes)
-- Decision flow: accept / reject / revision_required / publish
-- Revision upload (revision_required -> resubmitted)
-- Notifications (in-app + email mocked)
-- Admin user management, stats dashboards
-- Bilingual UI EN/ID
 
-### Iteration 2 (Feb 2026) — SEAIPC 2026 customization
-- **Rebrand**: Home, header, footer, all public copy switched to SEAIPC 2026
-- **New pages**: Call for Papers (39 sub-themes), Important Dates, Templates download (E-JITU EN + BM), About SEAIPC, Forgot Password, Reset Password
-- **Password reset flow**: `/api/auth/forgot-password` + `/api/auth/reset-password` (1h token)
-- **PDF inline preview**: `/api/files/{id}/preview?token=...` with iframe modal on PaperDetail
-- **DOI assignment**: editor can assign custom DOI on publish (auto-generated if not provided)
-- **CORS updated** for `seaipc2026.imz.or.id` domain
-- **Template downloads**: 2 E-JITU templates (English + Bahasa Melayu) via CDN
+### Iteration 1 (Feb 2026) — Core OJS
+- JWT auth, role-based (author/reviewer/editor/admin), demo seeding
+- Papers CRUD with PDF/DOCX upload to Emergent Object Storage
+- Review flow (assign, submit with score/recommendation/confidential notes)
+- Decision flow (accept/reject/revision/publish), revision upload
+- In-app notifications + email (Resend MOCKED)
+- Admin user management, role-specific stats, bilingual EN/ID
+
+### Iteration 2 (Feb 2026) — SEAIPC rebrand
+- Full SEAIPC 2026 branding (Home/Header/Footer/copy)
+- New public pages: Call for Papers (39 sub-themes), Key Dates, Templates (2 downloadable .docx), About
+- Password reset flow (forgot + reset with 1h token, MOCKED email)
+- PDF inline preview (iframe via token query param)
+- DOI assignment on publish (custom or auto-generated)
+- CORS ready for `seaipc2026.imz.or.id`
+
+### Iteration 3 (Feb 2026) — CMS & Theming
+- **Site Content CMS** at `/dashboard/cms` (admin only) with 7 tabs:
+  1. **Theme** — 8 color palettes (Classic Blue, Emerald, Slate, Royal Purple, Amber, Teal, Rose, Indigo), applied live via CSS vars
+  2. **Branding & Logo** — upload logo (PNG/JPG/SVG/WEBP), edit all hero text, conference metadata, stats
+  3. **Flyer** — upload flyer image (PNG/JPG/WEBP/PDF), toggle to show above Key Dates on Home, caption + external URL
+  4. **Key Dates** — add/edit/remove deadline rows
+  5. **About** — body + objectives[] + attendees[] + venue_items[] + organiser + contact
+  6. **Call for Papers** — title + intro + sub_themes[] + publications[]
+  7. **Templates** — CRUD template listings with name/language/filename/download URL
+- Backend: `/api/content` (GET public, PUT admin), `/api/content/logo/upload`, `/api/content/flyer/upload`, `/api/public/logo/{id}`, `/api/public/flyer/{id}`
+- Public pages (Home/About/CFP/Dates/Templates) refactored to read from ContentProvider
+- Home: **Flyer section added above Important Dates** (only shown when enabled + image present)
+- Logo displays in PublicHeader + Sidebar (fallback to initial letter)
+- **CORS/auth fix**: removed axios `withCredentials` (Emergent ingress overrides CORS headers); Bearer-only now
 
 ## Test Results
-- Iteration 1: 34/34 pytest (100%)
-- Iteration 2: 45/46 (97.8%) — 12/12 new SEAIPC feature tests pass. 1 flaky upstream storage 500 (not a bug).
+- Iteration 1: 34/34 (100%)
+- Iteration 2: 45/46 (1 flaky storage upstream, not bug) + 12/12 new
+- Iteration 3: **63/63 (100%)** — 17 new CMS + 46 regression. Zero bugs.
 
 ## Backlog / Next Phase
 ### P1 (High)
-- Add `RESEND_API_KEY` to unlock real emails (currently mocked)
+- Set `RESEND_API_KEY` to enable real emails (password reset + notifications)
 - Deploy to `seaipc2026.imz.or.id`
-- Per-email rate limit on forgot-password
-- TTL index on password_reset_tokens.expires_at
-- Preserve existing DOI if editor republishes without providing one
+- Split server.py (880+ lines) into routers: auth, papers, reviews, content, users
+- Split CMS.jsx (520+ lines) into per-tab files under `src/pages/cms/`
+- Deep-merge PUT /api/content to avoid partial wipes
+- Cache-Control headers on /api/public/logo and /api/public/flyer
 
-### P2 (Nice to have)
-- Real DOI registrar integration (Crossref/DataCite)
-- Multi-track submission (map paper -> sub-theme)
-- Reviewer expertise tagging & auto-suggest
-- Editor-in-chief super role
-- Plagiarism check stub
-- Global search across papers
-- Server-side proxy for template downloads (force-download headers)
+### P2
+- Nested Pydantic validation for content sections
+- Separate `content_files` collection from paper files
+- Per-email rate limit on forgot-password
+- DOI registrar integration (Crossref/DataCite)
+- Map paper → sub-theme (currently flat)
+- ContentProvider: add in-memory cache / SWR
 
 ### P3
 - ORCID integration
-- Multi-language beyond EN/ID (add Bahasa Melayu)
-- Stats charts (submissions over time)
-- Public author profile pages
-- Separate journals per partner publication
+- Stats charts, public author profiles
+- Multi-language CMS content (currently content is single-language)
+- Admin-uploaded hero image, not fixed
