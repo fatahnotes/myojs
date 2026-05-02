@@ -1,89 +1,611 @@
-from fastapi import FastAPI, APIRouter
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
-import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
-from datetime import datetime, timezone
-
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
+import os
+import uuid
+import logging
+import asyncio
+import bcrypt
+import jwt
+import requests
+import resend
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Literal
+
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, UploadFile, File, Depends, Query, Header
+from fastapi.responses import StreamingResponse
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, Field, EmailStr
+from bson import ObjectId
+from io import BytesIO
+
+# ==================== ENV & DB ====================
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
-app = FastAPI()
+JWT_SECRET = os.environ.get('JWT_SECRET', 'change-me')
+JWT_ALG = 'HS256'
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+APP_NAME = os.environ.get('APP_NAME', 'ojs-app')
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 
-# Create a router with the /api prefix
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
+
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+storage_key = None
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="OJS API")
 api_router = APIRouter(prefix="/api")
 
+# ==================== STORAGE ====================
+def init_storage():
+    global storage_key
+    if storage_key:
+        return storage_key
+    if not EMERGENT_LLM_KEY:
+        return None
+    try:
+        resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_LLM_KEY}, timeout=30)
+        resp.raise_for_status()
+        storage_key = resp.json()["storage_key"]
+        return storage_key
+    except Exception as e:
+        logger.error(f"Storage init failed: {e}")
+        return None
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    if not key:
+        raise HTTPException(status_code=500, detail="Storage not initialized")
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=120
+    )
+    resp.raise_for_status()
+    return resp.json()
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+def get_object(path: str):
+    key = init_storage()
+    if not key:
+        raise HTTPException(status_code=500, detail="Storage not initialized")
+    resp = requests.get(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key}, timeout=60
+    )
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
-# Add your routes to the router instead of directly to app
+# ==================== AUTH HELPERS ====================
+def hash_password(p: str) -> str:
+    return bcrypt.hashpw(p.encode(), bcrypt.gensalt()).decode()
+
+def verify_password(p: str, h: str) -> bool:
+    try:
+        return bcrypt.checkpw(p.encode(), h.encode())
+    except Exception:
+        return False
+
+def create_access_token(uid: str, email: str, role: str) -> str:
+    payload = {"sub": uid, "email": email, "role": role,
+               "exp": datetime.now(timezone.utc) + timedelta(hours=24), "type": "access"}
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+
+async def get_current_user(request: Request) -> dict:
+    token = request.cookies.get("access_token")
+    if not token:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+        user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+def require_roles(*roles):
+    async def checker(user: dict = Depends(get_current_user)):
+        if user["role"] not in roles and user["role"] != "admin":
+            raise HTTPException(status_code=403, detail="Forbidden")
+        return user
+    return checker
+
+# ==================== EMAIL ====================
+async def send_email(to: str, subject: str, html: str):
+    if not RESEND_API_KEY:
+        logger.info(f"[EMAIL MOCKED - no RESEND_API_KEY] To: {to} | Subject: {subject}")
+        return {"status": "mocked"}
+    try:
+        params = {"from": SENDER_EMAIL, "to": [to], "subject": subject, "html": html}
+        result = await asyncio.to_thread(resend.Emails.send, params)
+        return {"status": "sent", "id": result.get("id")}
+    except Exception as e:
+        logger.error(f"Email send failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+async def notify(user_id: str, title: str, message: str, link: Optional[str] = None, send_email_flag: bool = False):
+    notif = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "title": title,
+        "message": message,
+        "link": link,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notif)
+    if send_email_flag:
+        u = await db.users.find_one({"id": user_id}, {"_id": 0})
+        if u and u.get("email"):
+            html = f"<div style='font-family:sans-serif;padding:20px'><h2>{title}</h2><p>{message}</p><p>Open OJS: <a href='{FRONTEND_URL}'>{FRONTEND_URL}</a></p></div>"
+            await send_email(u["email"], title, html)
+
+# ==================== MODELS ====================
+Role = Literal["author", "reviewer", "editor", "admin"]
+PaperStatus = Literal["submitted", "under_review", "revision_required", "resubmitted", "accepted", "rejected", "published"]
+
+class RegisterIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    name: str
+    affiliation: Optional[str] = ""
+    role: Optional[Role] = "author"
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    affiliation: Optional[str] = ""
+    created_at: str
+
+class PaperIn(BaseModel):
+    title: str
+    abstract: str
+    keywords: List[str] = []
+    co_authors: List[str] = []
+
+class PaperOut(BaseModel):
+    id: str
+    title: str
+    abstract: str
+    keywords: List[str]
+    co_authors: List[str]
+    author_id: str
+    author_name: str
+    status: str
+    file_id: Optional[str] = None
+    file_name: Optional[str] = None
+    reviewer_ids: List[str] = []
+    decision: Optional[str] = None
+    decision_note: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+class AssignReviewersIn(BaseModel):
+    reviewer_ids: List[str]
+
+class ReviewIn(BaseModel):
+    score: int = Field(ge=1, le=10)
+    recommendation: Literal["accept", "minor_revision", "major_revision", "reject"]
+    comments: str
+    confidential_notes: Optional[str] = ""
+
+class DecisionIn(BaseModel):
+    decision: Literal["accept", "reject", "revision_required", "publish"]
+    note: str = ""
+
+class UpdateUserRoleIn(BaseModel):
+    role: Role
+
+# ==================== AUTH ROUTES ====================
+@api_router.post("/auth/register")
+async def register(body: RegisterIn, response: Response):
+    email = body.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Email already registered")
+    uid = str(uuid.uuid4())
+    role = body.role or "author"
+    # Don't allow self-registering as admin/editor through public register
+    if role in ("admin", "editor"):
+        role = "author"
+    user = {
+        "id": uid,
+        "email": email,
+        "password_hash": hash_password(body.password),
+        "name": body.name,
+        "affiliation": body.affiliation or "",
+        "role": role,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(user)
+    token = create_access_token(uid, email, role)
+    response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=86400, path="/")
+    return {"id": uid, "email": email, "name": body.name, "role": role,
+            "affiliation": user["affiliation"], "created_at": user["created_at"], "token": token}
+
+@api_router.post("/auth/login")
+async def login(body: LoginIn, response: Response):
+    email = body.email.lower()
+    u = await db.users.find_one({"email": email})
+    if not u or not verify_password(body.password, u["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_access_token(u["id"], u["email"], u["role"])
+    response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=86400, path="/")
+    return {"id": u["id"], "email": u["email"], "name": u["name"], "role": u["role"],
+            "affiliation": u.get("affiliation", ""), "created_at": u["created_at"], "token": token}
+
+@api_router.post("/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token", path="/")
+    return {"ok": True}
+
+@api_router.get("/auth/me")
+async def me(user: dict = Depends(get_current_user)):
+    return user
+
+# ==================== USERS ====================
+@api_router.get("/users")
+async def list_users(role: Optional[str] = None, user: dict = Depends(get_current_user)):
+    # Editors and admins can list users (esp. reviewers)
+    if user["role"] not in ("admin", "editor"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    q = {}
+    if role:
+        q["role"] = role
+    users = await db.users.find(q, {"_id": 0, "password_hash": 0}).to_list(1000)
+    return users
+
+@api_router.patch("/users/{user_id}/role")
+async def update_user_role(user_id: str, body: UpdateUserRoleIn, user: dict = Depends(require_roles("admin"))):
+    res = await db.users.update_one({"id": user_id}, {"$set": {"role": body.role}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str, user: dict = Depends(require_roles("admin"))):
+    if user_id == user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete self")
+    await db.users.delete_one({"id": user_id})
+    return {"ok": True}
+
+# ==================== PAPERS ====================
+async def _serialize_paper(p: dict) -> dict:
+    p.pop("_id", None)
+    return p
+
+@api_router.post("/papers")
+async def create_paper(body: PaperIn, user: dict = Depends(get_current_user)):
+    if user["role"] not in ("author", "admin", "editor", "reviewer"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    pid = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    paper = {
+        "id": pid,
+        "title": body.title,
+        "abstract": body.abstract,
+        "keywords": body.keywords,
+        "co_authors": body.co_authors,
+        "author_id": user["id"],
+        "author_name": user["name"],
+        "status": "submitted",
+        "file_id": None,
+        "file_name": None,
+        "reviewer_ids": [],
+        "decision": None,
+        "decision_note": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.papers.insert_one(paper)
+    # Notify all editors
+    editors = await db.users.find({"role": {"$in": ["editor", "admin"]}}, {"_id": 0, "id": 1}).to_list(100)
+    for e in editors:
+        await notify(e["id"], "New Paper Submission", f"'{body.title}' has been submitted.", f"/dashboard/papers/{pid}", send_email_flag=True)
+    await notify(user["id"], "Submission Received", f"Your paper '{body.title}' was submitted.", f"/dashboard/papers/{pid}", send_email_flag=True)
+    return await _serialize_paper(paper)
+
+@api_router.get("/papers")
+async def list_papers(status: Optional[str] = None, user: dict = Depends(get_current_user)):
+    q = {}
+    role = user["role"]
+    if role == "author":
+        q["author_id"] = user["id"]
+    elif role == "reviewer":
+        q["reviewer_ids"] = user["id"]
+    # editor/admin: see all
+    if status:
+        q["status"] = status
+    papers = await db.papers.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return papers
+
+@api_router.get("/papers/published")
+async def list_published():
+    # Public endpoint
+    papers = await db.papers.find({"status": "published"}, {"_id": 0}).sort("updated_at", -1).to_list(200)
+    return papers
+
+@api_router.get("/papers/{paper_id}")
+async def get_paper(paper_id: str, user: dict = Depends(get_current_user)):
+    p = await db.papers.find_one({"id": paper_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    role = user["role"]
+    if role == "author" and p["author_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if role == "reviewer" and user["id"] not in p.get("reviewer_ids", []):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return p
+
+@api_router.post("/papers/{paper_id}/upload")
+async def upload_paper_file(paper_id: str, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    p = await db.papers.find_one({"id": paper_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    if p["author_id"] != user["id"] and user["role"] not in ("admin", "editor"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "bin"
+    if ext not in ("pdf", "docx", "doc"):
+        raise HTTPException(status_code=400, detail="Only PDF/DOCX files allowed")
+    data = await file.read()
+    if len(data) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 25MB)")
+    file_id = str(uuid.uuid4())
+    path = f"{APP_NAME}/papers/{p['author_id']}/{file_id}.{ext}"
+    content_type = file.content_type or ("application/pdf" if ext == "pdf" else "application/octet-stream")
+    result = put_object(path, data, content_type)
+    file_doc = {
+        "id": file_id,
+        "paper_id": paper_id,
+        "storage_path": result["path"],
+        "original_filename": file.filename,
+        "content_type": content_type,
+        "size": result.get("size", len(data)),
+        "uploaded_by": user["id"],
+        "is_deleted": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.files.insert_one(file_doc)
+    new_status = p["status"]
+    if p["status"] == "revision_required":
+        new_status = "resubmitted"
+    await db.papers.update_one({"id": paper_id}, {"$set": {
+        "file_id": file_id, "file_name": file.filename, "status": new_status,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }})
+    return {"file_id": file_id, "filename": file.filename, "status": new_status}
+
+@api_router.get("/files/{file_id}/download")
+async def download_file(file_id: str, user: dict = Depends(get_current_user)):
+    f = await db.files.find_one({"id": file_id, "is_deleted": False}, {"_id": 0})
+    if not f:
+        raise HTTPException(status_code=404, detail="File not found")
+    p = await db.papers.find_one({"id": f["paper_id"]}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    role = user["role"]
+    allowed = role in ("admin", "editor") or p["author_id"] == user["id"] or user["id"] in p.get("reviewer_ids", [])
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    data, ct = get_object(f["storage_path"])
+    return StreamingResponse(BytesIO(data), media_type=f.get("content_type", ct),
+                             headers={"Content-Disposition": f'attachment; filename="{f["original_filename"]}"'})
+
+# ==================== REVIEWS ====================
+@api_router.post("/papers/{paper_id}/assign-reviewers")
+async def assign_reviewers(paper_id: str, body: AssignReviewersIn, user: dict = Depends(require_roles("editor"))):
+    p = await db.papers.find_one({"id": paper_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    # Validate reviewer ids
+    valid = await db.users.find({"id": {"$in": body.reviewer_ids}, "role": {"$in": ["reviewer", "editor", "admin"]}}, {"_id": 0, "id": 1}).to_list(50)
+    valid_ids = [v["id"] for v in valid]
+    if len(valid_ids) == 0:
+        raise HTTPException(status_code=400, detail="No valid reviewers")
+    await db.papers.update_one({"id": paper_id}, {"$set": {
+        "reviewer_ids": valid_ids, "status": "under_review",
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }})
+    for rid in valid_ids:
+        await notify(rid, "Review Assigned", f"You were assigned to review '{p['title']}'.", f"/dashboard/papers/{paper_id}", send_email_flag=True)
+    await notify(p["author_id"], "Review Started", f"Your paper '{p['title']}' is now under review.", f"/dashboard/papers/{paper_id}")
+    return {"ok": True, "reviewer_ids": valid_ids}
+
+@api_router.post("/papers/{paper_id}/reviews")
+async def submit_review(paper_id: str, body: ReviewIn, user: dict = Depends(get_current_user)):
+    p = await db.papers.find_one({"id": paper_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    if user["id"] not in p.get("reviewer_ids", []) and user["role"] not in ("admin", "editor"):
+        raise HTTPException(status_code=403, detail="You are not a reviewer of this paper")
+    # Update if exists
+    existing = await db.reviews.find_one({"paper_id": paper_id, "reviewer_id": user["id"]}, {"_id": 0})
+    review = {
+        "id": existing["id"] if existing else str(uuid.uuid4()),
+        "paper_id": paper_id,
+        "reviewer_id": user["id"],
+        "reviewer_name": user["name"],
+        "score": body.score,
+        "recommendation": body.recommendation,
+        "comments": body.comments,
+        "confidential_notes": body.confidential_notes or "",
+        "created_at": existing["created_at"] if existing else datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    if existing:
+        await db.reviews.update_one({"id": existing["id"]}, {"$set": review})
+    else:
+        await db.reviews.insert_one(review)
+    # Notify editors
+    editors = await db.users.find({"role": {"$in": ["editor", "admin"]}}, {"_id": 0, "id": 1}).to_list(100)
+    for e in editors:
+        await notify(e["id"], "Review Submitted", f"Review submitted for '{p['title']}'", f"/dashboard/papers/{paper_id}")
+    return {"ok": True, "review_id": review["id"]}
+
+@api_router.get("/papers/{paper_id}/reviews")
+async def list_reviews(paper_id: str, user: dict = Depends(get_current_user)):
+    p = await db.papers.find_one({"id": paper_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    role = user["role"]
+    reviews = await db.reviews.find({"paper_id": paper_id}, {"_id": 0}).to_list(100)
+    if role == "reviewer":
+        # Reviewer sees only their own
+        reviews = [r for r in reviews if r["reviewer_id"] == user["id"]]
+    elif role == "author":
+        # Author sees comments only after decision is made (or paper status not 'under_review')
+        if p["author_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        if p["status"] in ("under_review", "submitted"):
+            return []
+        # Strip confidential
+        reviews = [{**r, "confidential_notes": "", "reviewer_name": "Reviewer"} for r in reviews]
+    return reviews
+
+# ==================== DECISIONS ====================
+@api_router.post("/papers/{paper_id}/decision")
+async def make_decision(paper_id: str, body: DecisionIn, user: dict = Depends(require_roles("editor"))):
+    p = await db.papers.find_one({"id": paper_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    status_map = {"accept": "accepted", "reject": "rejected",
+                  "revision_required": "revision_required", "publish": "published"}
+    new_status = status_map[body.decision]
+    await db.papers.update_one({"id": paper_id}, {"$set": {
+        "status": new_status, "decision": body.decision, "decision_note": body.note,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }})
+    title_msg = {
+        "accept": "Paper Accepted", "reject": "Paper Rejected",
+        "revision_required": "Revision Required", "publish": "Paper Published"
+    }[body.decision]
+    await notify(p["author_id"], title_msg, f"Decision on '{p['title']}': {body.decision}. {body.note}", f"/dashboard/papers/{paper_id}", send_email_flag=True)
+    return {"ok": True, "status": new_status}
+
+# ==================== NOTIFICATIONS ====================
+@api_router.get("/notifications")
+async def my_notifications(user: dict = Depends(get_current_user)):
+    items = await db.notifications.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).limit(50).to_list(50)
+    return items
+
+@api_router.post("/notifications/{notif_id}/read")
+async def mark_read(notif_id: str, user: dict = Depends(get_current_user)):
+    await db.notifications.update_one({"id": notif_id, "user_id": user["id"]}, {"$set": {"read": True}})
+    return {"ok": True}
+
+@api_router.post("/notifications/read-all")
+async def mark_all_read(user: dict = Depends(get_current_user)):
+    await db.notifications.update_many({"user_id": user["id"]}, {"$set": {"read": True}})
+    return {"ok": True}
+
+# ==================== STATS ====================
+@api_router.get("/stats")
+async def stats(user: dict = Depends(get_current_user)):
+    role = user["role"]
+    base = {}
+    if role == "author":
+        base["my_papers"] = await db.papers.count_documents({"author_id": user["id"]})
+        base["under_review"] = await db.papers.count_documents({"author_id": user["id"], "status": "under_review"})
+        base["accepted"] = await db.papers.count_documents({"author_id": user["id"], "status": {"$in": ["accepted", "published"]}})
+    elif role == "reviewer":
+        base["assigned"] = await db.papers.count_documents({"reviewer_ids": user["id"]})
+        base["pending"] = await db.papers.count_documents({"reviewer_ids": user["id"], "status": "under_review"})
+        base["completed"] = await db.reviews.count_documents({"reviewer_id": user["id"]})
+    else:  # editor/admin
+        base["total_papers"] = await db.papers.count_documents({})
+        base["pending_review"] = await db.papers.count_documents({"status": {"$in": ["submitted", "resubmitted"]}})
+        base["under_review"] = await db.papers.count_documents({"status": "under_review"})
+        base["published"] = await db.papers.count_documents({"status": "published"})
+        base["users"] = await db.users.count_documents({})
+    return base
+
+# ==================== HEALTH ====================
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "OJS API ready"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
+# ==================== STARTUP ====================
+@app.on_event("startup")
+async def startup():
+    # Indexes
+    await db.users.create_index("email", unique=True)
+    await db.users.create_index("id", unique=True)
+    await db.papers.create_index("id", unique=True)
+    await db.papers.create_index("author_id")
+    await db.reviews.create_index([("paper_id", 1), ("reviewer_id", 1)], unique=True)
+    await db.notifications.create_index("user_id")
+    # Seed admin
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@ojs.com").lower()
+    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    existing = await db.users.find_one({"email": admin_email})
+    if not existing:
+        await db.users.insert_one({
+            "id": str(uuid.uuid4()),
+            "email": admin_email,
+            "password_hash": hash_password(admin_password),
+            "name": "System Admin",
+            "affiliation": "OJS",
+            "role": "admin",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        logger.info(f"Seeded admin: {admin_email}")
+    elif not verify_password(admin_password, existing["password_hash"]):
+        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+    # Seed demo users (one per role) if not exists
+    demo_users = [
+        ("author@ojs.com", "author123", "Demo Author", "author"),
+        ("reviewer@ojs.com", "reviewer123", "Demo Reviewer", "reviewer"),
+        ("editor@ojs.com", "editor123", "Demo Editor", "editor"),
+    ]
+    for email, pw, name, role in demo_users:
+        if not await db.users.find_one({"email": email}):
+            await db.users.insert_one({
+                "id": str(uuid.uuid4()),
+                "email": email,
+                "password_hash": hash_password(pw),
+                "name": name,
+                "affiliation": "OJS",
+                "role": role,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
 
-# Include the router in the main app
-app.include_router(api_router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+    # Init storage
+    init_storage()
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+# Routes & CORS
+app.include_router(api_router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
